@@ -32,9 +32,10 @@ const askUserWhatToBuy = function() {
     }]).then(value => {
         let id = parseInt(value.id)
         let quantity = value.quantity
-        connection.query(`SELECT * FROM products WHERE id = ${id}`, function(err, data) {
+        connection.query(`SELECT * FROM products WHERE id = ${id} AND quantity > 1`, function(err, data) {
             if (err) {
-                throw err
+                console.log("You have made an invalid selection. Please try again")
+                askUserWhatToBuy()
             } else if (data.length === 0) {
                 console.log("Invalid Id. Please pick a valid Id.")
             } else {
@@ -65,7 +66,19 @@ const askUserWhatToBuy = function() {
     }).catch(function(error) {
         console.log(error)
     }).then(function() {
-        connection.end()
+        inquirer.prompt([{
+            type: "list",
+            name: "choice",
+            message: "Would you like to purchase another item?",
+            choices: ["Yes", "No"],
+            default: "Yes"
+        }]).then(response =>{
+            if (response.choice === "Yes"){
+                askUserWhatToBuy()
+            } else if (response.choice === "No"){
+                connection.end()
+            } 
+        })
     }).catch(function(err) {
         console.log(err)
     })
@@ -76,75 +89,100 @@ function managerView() {
         type: "list",
         name: "action",
         message: "Select an Action",
-        choices: ["View Products for Sale", "View Low Inventory", "Increase Inventory", "Add New Product"]
+        choices: ["View Products for Sale", "View Low Inventory", "Increase Inventory", "Add New Product", "Exit"],
+        default: "View Products for Sale"
     }]).then(function(response) {
-            let state = response.action
-            console.log(state)
-            if (state === "View Products for Sale") {
-                checkTable()
-                connection.end()
-                return
-            } else if (state === "View Low Inventory") {
-                connection.query("SELECT item_name, quantity FROM products WHERE quantity < 10", function(err, data) {
-                    if (err) throw err
-                    console.log(`Items with low quantity\n`)
-                    console.table(data)
-                    connection.end()
+        let state = response.action
+        console.log(state)
+        if (state === "View Products for Sale") {
+            checkTable()
+            managerView()
+            return
+        } else if (state === "View Low Inventory") {
+            connection.query("SELECT item_name, quantity FROM products WHERE quantity < 10", function(err, data) {
+                if (err) throw err
+                console.log(`Items with low quantity\n`)
+                console.table(data)
+                managerView()
+            })
+            return
+        } else if (state === "Add New Product") {
+            inquirer.prompt([{
+                type: "input",
+                name: "name",
+                message: "Type in the name of the new item"
+            }, {
+                type: "list",
+                name: "department",
+                message: "Select the department of the item",
+                choices: ["electronics", "food", "clothing", "tools"]
+            }, {
+                type: "input",
+                name: "price",
+                message: "Please select a price for each item"
+            }, {
+                type: "input",
+                name: "quantity",
+                message: "Please enter a quantity for the number of items"
+            }]).then(function(response) {
+                console.log(response)
+                connection.query(`INSERT INTO products (item_name, department_name, price, quantity) VALUES ("${response.name}", "${response.department}", ${parseInt(response.price)}, ${parseInt(response.quantity)})`, function(err, data) {
+                    if (err) {
+                        console.log("You have made an invalid selection. Please start over.")
+                        managerView()
+                    }
+                    console.log(`${data.affectedRows} added`)
+                    checkTable()
+                    managerView()
                 })
-                return
-            } else if (state === "Add New Product") {
-                inquirer.prompt([{
-                    type: "input",
-                    name: "name",
-                    message: "Type in the name of the new item"
-                }, {
-                    type: "list",
-                    name: "department",
-                    message: "Select the department of the item",
-                    choices: ["electronics", "food", "clothing", "tools"]
-                }, {
-                    type: "input",
-                    name: "price",
-                    message: "Please select a price for each item"
-                }, {
-                    type: "input",
-                    name: "quantity",
-                    message: "Please enter a quantity for the number of items"
-                }]).then(function(response) {
-                    console.log(response)
-                    connection.query(`INSERT INTO products (item_name, department_name, price, quantity) VALUES ("${response.name}", "${response.department}", ${parseInt(response.price)}, ${parseInt(response.quantity)})`, function(err, data) {
-                        if (err) throw err
-                        console.log(`${data.affectedRows} added`)
-                        checkTable()
-                        connection.end()
-                    })
-                })
-                return
-            } else if (state === "Increase Inventory") {
+            })
+            return
+        } else if (state === "Increase Inventory") {
 
-                checkTable()
-                inquirer.prompt([{
-                    type: "input",
-                    name: "id",
-                    message: "Select the Id of the item to add Inventory to"
-                }, {
-                    type: "input",
-                    name: "quantity",
-                    message: "Enter the number of inventory added"
-                }]).then((response) => {
-                    connection.query(`UPDATE products SET quantity = quantity + ${parseInt(response.quantity)} WHERE id = ${parseInt(response.id)}`, function(err, data) {
-                        if (err) throw err
-                            console.log(`${data.affectedRows} updated`)
-                            checkTable()
-                            connection.end()
-                        })
-                });
-                return
-            }
+            checkTable()
+            inquirer.prompt([{
+                type: "input",
+                name: "id",
+                message: "Select the Id of the item to add Inventory to"
+            }, {
+                type: "input",
+                name: "quantity",
+                message: "Enter the number of inventory added"
+            }]).then((response) => {
+                connection.query(`UPDATE products SET quantity = quantity + ${parseInt(response.quantity)} WHERE id = ${parseInt(response.id)}`, function(err, data) {
+                    if (err) {
+                        console.log("You have made an invalid selection. Please start over.")
+                        managerView()
+                    }
+                    console.log(`${data.affectedRows} updated`)
+                    checkTable()
+                    managerView()
+                })
+            });
+            return
+        } else if (state === "Exit") {
+            connection.end()
+        }
 
     }).catch(function(err) {
-    console.log(err)
-})
+        console.log(err)
+    })
 }
 
-managerView()
+function start() {
+    inquirer.prompt([{
+        type: "list",
+        name: "choice",
+        message: "Are you a customer or a manager?",
+        default: "Customer",
+        choices: ["Customer", "Manager"]
+    }]).then(response => {
+        if (response.choice === "Customer") {
+            askUserWhatToBuy()
+        } else if (response.choice === "Manager") {
+            managerView()
+        }
+    })
+}
+
+start()
