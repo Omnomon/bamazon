@@ -17,5 +17,5 @@ Format:![Alt Text](url)
 Format:![Alt Text](url)
 
 5. You may repeat Steps 2-4 for a new action. If you select <Exit>, you will end the program. 
-![step4.5](/step5.png)
-Format:![Alt Text](url)
+![step4.5](/step4.5.png)
+
